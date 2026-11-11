@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, field_validator
 
-from database import accounts_validators
+from database.validators import accounts as accounts_validators
 
 
 def validate_new_password(password: str) -> str:

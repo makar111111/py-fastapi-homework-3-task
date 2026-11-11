@@ -108,6 +108,7 @@ async def test_reset_rejects_weak_new_password(client, db_session, seed_user_gro
     )
 
     assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid email or token."
 
 
 @pytest.mark.asyncio
@@ -116,6 +117,19 @@ async def test_refresh_rejects_invalid_token(client):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid token."
+
+
+@pytest.mark.asyncio
+async def test_registration_rolls_back_unexpected_errors(db_session, seed_user_groups):
+    payload = {"email": "failure@example.com", "password": "StrongPass1!"}
+    async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as client:
+        with patch("routes.accounts.AsyncSession.commit", side_effect=RuntimeError("unexpected failure")):
+            response = await client.post("/api/v1/accounts/register/", json=payload)
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "An error occurred during user creation."
+    await db_session.rollback()
+    assert await db_session.scalar(select(UserModel.id).where(UserModel.email == payload["email"])) is None
 
 
 @pytest.mark.asyncio

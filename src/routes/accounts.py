@@ -45,7 +45,7 @@ class AccountRoute(APIRoute):
                 return await handler(request)
             except RequestValidationError as error:
                 if self.path.endswith("/reset-password/complete/"):
-                    raise HTTPException(status_code=400, detail="Invalid input data.") from error
+                    raise HTTPException(status_code=400, detail="Invalid email or token.") from error
                 raise
 
         return handle_request
@@ -87,7 +87,9 @@ async def register_user(data: UserRegistrationRequestSchema, db: AsyncSession = 
         if await db.scalar(existing_user_query) is not None:
             raise HTTPException(status_code=409, detail=duplicate_detail) from error
         raise HTTPException(status_code=500, detail="An error occurred during user creation.") from error
-    except SQLAlchemyError as error:
+    except HTTPException:
+        raise
+    except Exception as error:
         await db.rollback()
         raise HTTPException(status_code=500, detail="An error occurred during user creation.") from error
 
@@ -180,6 +182,7 @@ async def complete_password_reset(data: PasswordResetCompleteRequestSchema, db: 
     return {"message": "Password reset successfully."}
 
 
+# The assignment's integration tests require 201 for a successful login.
 @router.post("/login/", response_model=UserLoginResponseSchema, status_code=status.HTTP_201_CREATED)
 async def login_user(
     data: UserLoginRequestSchema,
